@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ApplyPilot · 表单核对</title>
+    <link rel="icon" type="image/svg+xml" href="/icon/logo.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icon/32.png" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <!--
+      说明：WXT 会把 `entrypoints/sidepanel/index.tsx` 识别为名为 sidepanel 的 unlisted entrypoint，
+      与 sidepanel.html 重名导致构建失败，所以 React 入口放在 sidepanel/main.tsx。
+    -->
+    <script type="module" src="./sidepanel/main.tsx"></script>
+  </body>
+</html>

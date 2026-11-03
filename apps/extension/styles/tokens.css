@@ -1,0 +1,249 @@
+/* ==================================================================
+ * ApplyPilot 语义主题令牌（两套主题：亮 / 暗）
+ * 机制：html class：.dark 切暗色，不加则为亮色，默认 dark
+ * 约束：正文类颜色一律写不透明 6 位 hex；边框 / 输入框可用 rgba
+ * 圆角：不动，直接用 Tailwind v4 默认档（sm .25 / md .375 / lg .5 / xl .75）
+ * 提醒：注释里不要出现星号加斜杠的闭合序列，否则会把 @theme 整块截断
+ * ================================================================== */
+
+/* —— 第 0 节 工具类生成：light 默认值（Tailwind v4 由 @theme 生成 bg- / text- 等工具类）
+      新增令牌必须同时写在这里，否则 bg-brand-hover / bg-overlay 等不会生成 —— */
+@theme {
+  --color-background: #f8f8f8;
+  --color-background-alt: #eef1f5;
+  --color-background-win-alt: #e8ecf1;
+  --color-header: #ffffff;
+  --color-panel: #ffffff;
+  --color-sidebar: #f8fafc;
+  --color-surface: rgba(15, 23, 42, 0.04);
+  --color-surface-hover: rgba(15, 23, 42, 0.07);
+  --color-card: #ffffff;
+  --color-card-selected: #eef1f5;
+  --color-card-border: var(--color-border);
+  --color-popover: #ffffff;
+  --color-popover-foreground: var(--color-foreground);
+  --color-popover-header: #f8fafc;
+  --color-popover-border: var(--color-border);
+  --color-menu: #ffffff;
+  --color-menu-hover: #f1f5f9;
+  --color-input: #ffffff;
+  --color-input-focused: #ffffff;
+  --color-input-border: rgba(15, 23, 42, 0.22);
+  --color-input-border-hover: rgba(15, 23, 42, 0.34);
+  --color-input-border-focused: var(--color-brand);
+  --color-foreground: #000000;
+  --color-foreground-subtle: #1e293b;
+  --color-foreground-subtlest: #3f4c5e;
+  --color-foreground-inverse: #ffffff;
+  --color-border: rgba(15, 23, 42, 0.14);
+  --color-border-hover: rgba(15, 23, 42, 0.26);
+  --color-brand: #0369a1;
+  --color-brand-hover: #075985;
+  --color-brand-foreground: #ffffff;
+  --color-icon-blue: #0284c7;
+  --color-accent: var(--color-brand);
+  --color-primary: #0f172a;
+  --color-primary-hover: #1e293b;
+  --color-primary-foreground: #f8fafc;
+  --color-secondary: #e2e8f0;
+  --color-hover: #f1f5f9;
+  --color-selected: rgba(15, 23, 42, 0.07);
+  --color-success: #166534;
+  --color-success-foreground: #ffffff;
+  --color-warning: #92400e;
+  --color-warning-foreground: #ffffff;
+  --color-destructive: #b91c1c;
+  --color-destructive-foreground: #ffffff;
+  --color-diff-added: #166534;
+  --color-diff-added-foreground: #ffffff;
+  --color-diff-removed: #b91c1c;
+  --color-diff-removed-foreground: #ffffff;
+  --color-toast: #ffffff;
+  --color-tooltip: #0f172a;
+  --color-tooltip-foreground: #f8fafc;
+  --color-tag: #e2e8f0;
+  --color-find-highlight: #fde68a;
+  --color-find-highlight-active: #facc15;
+  --color-interaction-ask-surface: #e0f2fe;
+  --color-interaction-ask-foreground: #075985;
+  --color-interaction-ask-fill: rgba(22, 163, 74, 0.2);
+  --color-interaction-confirmation-surface: #dcfce7;
+  --color-interaction-confirmation-foreground: #166534;
+  --color-idle-task: #7c3aed;
+  --color-idle-task-surface: #ede9fe;
+  --color-ring: #0284c7;
+  --color-overlay: rgba(15, 23, 42, 0.45);
+  --color-muted: var(--color-surface);
+  --color-muted-foreground: var(--color-foreground-subtle);
+  /* 兼容别名：旧 auto-info 令牌名 → 新语义令牌（sidepanel / button 仍在用旧名） */
+  --color-bg: var(--color-background);
+  --color-panel-2: var(--color-background-alt);
+  --color-line: var(--color-border);
+  --color-ink: var(--color-foreground);
+  --color-sub: var(--color-foreground-subtle);
+  --color-dim: var(--color-foreground-subtlest);
+  --color-good: var(--color-success);
+  --color-warn: var(--color-warning);
+  --color-bad: var(--color-destructive);
+  --color-violet: var(--color-idle-task);
+  /* 字号：只改 --ui-font-size（默认 14px），最小档由 max() 兜底不低于 10px */
+  --text-ui-xl: calc(var(--ui-font-size) + 4px);
+  --text-ui-lg: calc(var(--ui-font-size) + 2px);
+  --text-ui-base: var(--ui-font-size);
+  --text-ui-caption: calc(var(--ui-font-size) - 1px);
+  --text-ui-sm: calc(var(--ui-font-size) - 2px);
+  --text-ui-xs: max(11px, calc(var(--ui-font-size) - 3px));
+  --text-ui-2xs: max(10px, calc(var(--ui-font-size) - 4px));
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", monospace;
+}
+
+/* dark: 走 class 切换（覆盖 Tailwind 默认的 prefers-color-scheme 行为） */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* —— 第 1 节 :root ＝ 亮色（运行时真值；字号 / 动效只在这里定义一份） —— */
+/* text-ui-* 展开值（ui-font-size=14 时）：xl 18 / lg 16 / base 14 / caption 13 / sm 12 / xs 11 / 2xs 10 */
+:root {
+  color-scheme: light;
+  --ui-font-size: 14px;
+  --wf-t-fast: 120ms;
+  --wf-t-base: 160ms;
+  --wf-t-enter: 200ms;
+  --wf-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --color-background: #f8f8f8;
+  --color-background-alt: #eef1f5;
+  --color-background-win-alt: #e8ecf1;
+  --color-header: #ffffff;
+  --color-panel: #ffffff;
+  --color-sidebar: #f8fafc;
+  --color-surface: rgba(15, 23, 42, 0.04);
+  --color-surface-hover: rgba(15, 23, 42, 0.07);
+  --color-card: #ffffff;
+  --color-card-selected: #eef1f5;
+  --color-card-border: var(--color-border);
+  --color-popover: #ffffff;
+  --color-popover-foreground: var(--color-foreground);
+  --color-popover-header: #f8fafc;
+  --color-popover-border: var(--color-border);
+  --color-menu: #ffffff;
+  --color-menu-hover: #f1f5f9;
+  --color-input: #ffffff;
+  --color-input-focused: #ffffff;
+  --color-input-border: rgba(15, 23, 42, 0.22);
+  --color-input-border-hover: rgba(15, 23, 42, 0.34);
+  --color-input-border-focused: var(--color-brand);
+  --color-foreground: #000000;
+  --color-foreground-subtle: #1e293b;
+  --color-foreground-subtlest: #3f4c5e;
+  --color-foreground-inverse: #ffffff;
+  --color-border: rgba(15, 23, 42, 0.14);
+  --color-border-hover: rgba(15, 23, 42, 0.26);
+  --color-brand: #0369a1;
+  --color-brand-hover: #075985;
+  --color-brand-foreground: #ffffff;
+  --color-icon-blue: #0284c7;
+  --color-accent: var(--color-brand);
+  --color-primary: #0f172a;
+  --color-primary-hover: #1e293b;
+  --color-primary-foreground: #f8fafc;
+  --color-secondary: #e2e8f0;
+  --color-hover: #f1f5f9;
+  --color-selected: rgba(15, 23, 42, 0.07);
+  --color-success: #166534;
+  --color-success-foreground: #ffffff;
+  --color-warning: #92400e;
+  --color-warning-foreground: #ffffff;
+  --color-destructive: #b91c1c;
+  --color-destructive-foreground: #ffffff;
+  --color-diff-added: #166534;
+  --color-diff-added-foreground: #ffffff;
+  --color-diff-removed: #b91c1c;
+  --color-diff-removed-foreground: #ffffff;
+  --color-toast: #ffffff;
+  --color-tooltip: #0f172a;
+  --color-tooltip-foreground: #f8fafc;
+  --color-tag: #e2e8f0;
+  --color-find-highlight: #fde68a;
+  --color-find-highlight-active: #facc15;
+  --color-interaction-ask-surface: #e0f2fe;
+  --color-interaction-ask-foreground: #075985;
+  --color-interaction-ask-fill: rgba(22, 163, 74, 0.2);
+  --color-interaction-confirmation-surface: #dcfce7;
+  --color-interaction-confirmation-foreground: #166534;
+  --color-idle-task: #7c3aed;
+  --color-idle-task-surface: #ede9fe;
+  --color-ring: #0284c7;
+  --color-overlay: rgba(15, 23, 42, 0.45);
+  --color-muted: var(--color-surface);
+  --color-muted-foreground: var(--color-foreground-subtle);
+}
+
+/* —— 第 2 节 .dark ＝ 暗色 —— */
+.dark {
+  color-scheme: dark;
+  --color-background: #0f1115;
+  --color-background-alt: #161a20;
+  --color-background-win-alt: #1a1e25;
+  --color-header: #15181e;
+  --color-panel: #15181e;
+  --color-sidebar: #0f1115;
+  --color-surface: rgba(255, 255, 255, 0.05);
+  --color-surface-hover: rgba(255, 255, 255, 0.09);
+  --color-card: #1a1e25;
+  --color-card-selected: #262c35;
+  --color-card-border: var(--color-border);
+  --color-popover: #1a1e25;
+  --color-popover-foreground: var(--color-foreground);
+  --color-popover-header: #20252d;
+  --color-popover-border: var(--color-border);
+  --color-menu: #1a1e25;
+  --color-menu-hover: #262c35;
+  --color-input: #1d222a;
+  --color-input-focused: #1d222a;
+  --color-input-border: rgba(255, 255, 255, 0.16);
+  --color-input-border-hover: rgba(255, 255, 255, 0.28);
+  --color-input-border-focused: var(--color-brand);
+  --color-foreground: #ffffff;
+  --color-foreground-subtle: #c2cbd7;
+  --color-foreground-subtlest: #9aa6b8;
+  --color-foreground-inverse: #0f1115;
+  --color-border: rgba(255, 255, 255, 0.12);
+  --color-border-hover: rgba(255, 255, 255, 0.24);
+  --color-brand: #4cc2ff;
+  --color-brand-hover: #7ad3ff;
+  --color-brand-foreground: #052a3d;
+  --color-icon-blue: #7ad3ff;
+  --color-accent: var(--color-brand);
+  --color-primary: #e6eaf0;
+  --color-primary-hover: #ffffff;
+  --color-primary-foreground: #10141a;
+  --color-secondary: #262c35;
+  --color-hover: #262c35;
+  --color-selected: rgba(255, 255, 255, 0.1);
+  --color-success: #4ade80;
+  --color-success-foreground: #052e16;
+  --color-warning: #fbbf24;
+  --color-warning-foreground: #241500;
+  --color-destructive: #f87171;
+  --color-destructive-foreground: #2b0a0a;
+  --color-diff-added: #4ade80;
+  --color-diff-added-foreground: #052e16;
+  --color-diff-removed: #f87171;
+  --color-diff-removed-foreground: #2b0a0a;
+  --color-toast: #1a1e25;
+  --color-tooltip: #f8fafc;
+  --color-tooltip-foreground: #0f1115;
+  --color-tag: #2a313b;
+  --color-find-highlight: #713f12;
+  --color-find-highlight-active: #a16207;
+  --color-interaction-ask-surface: rgba(76, 194, 255, 0.12);
+  --color-interaction-ask-foreground: #7ad3ff;
+  --color-interaction-ask-fill: rgba(74, 222, 128, 0.24);
+  --color-interaction-confirmation-surface: rgba(74, 222, 128, 0.14);
+  --color-interaction-confirmation-foreground: #86efac;
+  --color-idle-task: #a78bfa;
+  --color-idle-task-surface: rgba(167, 139, 250, 0.14);
+  --color-ring: #4cc2ff;
+  --color-overlay: rgba(0, 0, 0, 0.62);
+  --color-muted: var(--color-surface);
+  --color-muted-foreground: var(--color-foreground-subtle);
+}

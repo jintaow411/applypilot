@@ -1,0 +1,103 @@
+@import "tailwindcss";
+@import "./styles/tokens.css";
+
+/* 基础样式：画布 / 选中 / 滚动条 / 焦点基线（颜色全部走语义令牌） */
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  /* 滚动条常驻：视口纵向滚动条始终占位，折叠/展开内容时宽度不抖 */
+  html {
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    font-size: var(--ui-font-size);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* 键盘焦点基线：组件自带的 ring 仍保留，这里兜底所有可交互元素 */
+  :where(
+      a,
+      summary,
+      [tabindex],
+      button:not([data-slot="button"]),
+      input:not([data-slot="input"]),
+      select:not([data-slot="select"]),
+      textarea:not([data-slot="textarea"])
+    ):focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-brand) 32%, transparent);
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border-hover);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-foreground-subtlest);
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  @keyframes ai-slide-in-right {
+    from {
+      transform: translateX(48px);
+      opacity: 0.4;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes ai-slide-out-right {
+    from {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateX(48px);
+      opacity: 0.4;
+    }
+  }
+
+  @keyframes ai-toast-in {
+    from {
+      transform: translateY(10px) scale(0.98);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [style*="ai-toast-in"],
+    [style*="ai-slide-out-right"] {
+      animation: none !important;
+    }
+  }
+}

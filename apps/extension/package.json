@@ -1,0 +1,31 @@
+{
+  "name": "applypilot-extension",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "求职表单自动回填浏览器扩展",
+  "packageManager": "pnpm@11.8.0",
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build",
+    "zip": "wxt zip",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.454.0",
+    "mammoth": "^1.13.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^2.5.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "@wxt-dev/module-react": "1.2.1",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.6.3",
+    "wxt": "^0.19.0"
+  }
+}

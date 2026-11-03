@@ -1,0 +1,875 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>ApplyPilot · 架构与数据流</title>
+<style>
+  :root{
+    --paper:#f1ece1;
+    --paper-2:#fbf8ef;
+    --ink:#211e19;
+    --ink-2:#5b554a;
+    --ink-3:#8b8374;
+    --hair:#d3cab8;
+    --grid:rgba(70,58,40,.055);
+    --accent:#9a3f28;
+    --accent-soft:rgba(154,63,40,.075);
+    --green:#3c5847;
+    --slate:#31485a;
+    --serif:"Songti SC","Noto Serif CJK SC","Source Han Serif SC",Georgia,serif;
+    --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,"Roboto Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-font-smoothing:antialiased;text-size-adjust:100%}
+  body{
+    margin:0;color:var(--ink);background-color:var(--paper);
+    background-image:
+      linear-gradient(var(--grid) 1px,transparent 1px),
+      linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+    background-size:28px 28px;
+    font:14px/1.6 var(--sans);
+  }
+  .page{max-width:1340px;margin:0 auto;padding:38px 40px 64px}
+
+  .meta{display:flex;gap:10px;align-items:center;
+    font:11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+  .meta .ver{margin-left:auto;letter-spacing:.06em}
+
+  h1{font-family:var(--serif);font-weight:600;font-size:34px;line-height:1.34;
+    letter-spacing:.01em;margin:26px 0 14px;max-width:24em}
+  h1 em{font-style:normal;color:var(--accent);border-bottom:1px solid rgba(154,63,40,.4);padding-bottom:1px}
+  .lead{max-width:58em;margin:0 0 24px;color:var(--ink-2);font-size:14.5px}
+
+  .facts{display:flex;flex-wrap:wrap;gap:10px 26px;padding:12px 0;
+    border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);
+    font:12px/1.5 var(--mono);color:var(--ink-2)}
+  .facts b{color:var(--ink);font-weight:600}
+  .facts .hl b{color:var(--accent)}
+
+  .legend{display:flex;flex-wrap:wrap;gap:20px;justify-content:flex-end;
+    margin:30px 0 8px;font:11px/1 var(--mono);color:var(--ink-3)}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .legend i{display:inline-block;width:26px;height:0;border-top:1px solid var(--ink-2)}
+  .legend i.dashed{border-top-style:dashed;border-color:var(--green)}
+  .legend i.dot{width:5px;height:5px;border:0;border-radius:50%;background:var(--accent)}
+
+  .fig{margin:26px 0 0}
+  .fig-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+    border-top:1px solid var(--ink);padding-top:12px;margin-bottom:6px}
+  .fig-no{font:11px/1 var(--mono);letter-spacing:.1em;color:var(--accent);padding-top:4px}
+  .fig-head h2{font-family:var(--serif);font-size:18px;font-weight:600;margin:0;letter-spacing:.01em}
+  .fig-note{margin-left:auto;font:11px/1.6 var(--mono);color:var(--ink-3)}
+  .fig-scroll{overflow-x:auto;overflow-y:hidden;padding:2px 0 6px}
+  .fig-scroll svg{display:block;width:100%;min-width:1000px;height:auto}
+
+  .callout{margin:18px 0 0;padding-left:14px;border-left:2px solid var(--accent);
+    max-width:68em;color:var(--ink-2);font-size:13px}
+  .callout b{color:var(--ink);font-weight:600}
+
+  .handoff{display:flex;align-items:center;gap:14px;margin:30px 0 4px;color:var(--ink-3)}
+  .handoff .rule{flex:1;border-top:1px dashed var(--hair)}
+  .handoff span.txt{font:10.5px/1 var(--mono);letter-spacing:.04em;white-space:nowrap}
+
+  .redlines{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;
+    margin:52px 0 0;padding-top:14px;border-top:1px solid var(--hair)}
+  .redlines div{font-size:12.5px;color:var(--ink-2);line-height:1.65}
+  .redlines span{display:block;font:10.5px/1 var(--mono);color:var(--accent);letter-spacing:.08em;margin-bottom:6px}
+
+  .foot{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:30px;
+    font:11px/1.7 var(--mono);color:var(--ink-3)}
+
+  /* ---------- svg ---------- */
+  svg text{font-family:var(--sans)}
+  .node rect.box{fill:var(--paper-2);stroke:var(--hair);stroke-width:1}
+  .node:hover rect.box{stroke:var(--ink-2)}
+  .node.core rect.box{fill:#fbf6ec;stroke:var(--accent);stroke-width:1.25}
+  .node.core rect.offset{fill:none;stroke:rgba(154,63,40,.18);stroke-width:1}
+  .node.optional rect.box{fill:transparent;stroke:var(--slate);stroke-width:1;stroke-dasharray:4 4}
+  .t-idx{font:9px/1 var(--mono);fill:var(--ink-3);letter-spacing:.1em}
+  .t-title{font:600 12.5px/1 var(--sans);fill:var(--ink);letter-spacing:.01em}
+  .t-core-title{font:600 16px/1 var(--serif);fill:var(--ink);letter-spacing:.02em}
+  .t-sub{font:11px/1 var(--sans);fill:var(--ink-2)}
+  .t-mono{font:9.5px/1 var(--mono);fill:var(--ink-3);letter-spacing:.02em}
+  .t-tap{font:9.5px/1 var(--mono);fill:var(--ink-2);letter-spacing:.02em}
+  .t-note{font:9px/1.35 var(--sans);fill:var(--ink-3)}
+  .t-green{font:9px/1 var(--mono);fill:var(--green);letter-spacing:.02em}
+  .bar{fill:var(--accent-soft);stroke:rgba(154,63,40,.28);stroke-width:.75}
+  .bar-t{font:9.5px/1 var(--mono);fill:#6d4234;letter-spacing:.02em}
+  .edge{fill:none;stroke:var(--ink-2);stroke-width:1}
+  .edge.accent{stroke:var(--accent)}
+  .edge.slate{stroke:var(--slate);stroke-dasharray:4 4}
+  .edge.green{stroke:var(--green);stroke-dasharray:5 6;animation:dash 1.8s linear infinite}
+  .tap-line{stroke:rgba(91,85,74,.28);stroke-width:1}
+  .tap-dot{fill:var(--ink-3)}
+  @keyframes dash{to{stroke-dashoffset:-22}}
+  @media(prefers-reduced-motion:reduce){
+    .edge.green{animation:none}
+    .pulse{display:none}
+  }
+  @media(max-width:900px){
+    .page{padding:26px 18px 48px}
+    h1{font-size:27px}
+    .redlines{grid-template-columns:1fr;gap:14px}
+    .fig-note{margin-left:0;width:100%}
+    .legend{justify-content:flex-start}
+  }
+</style>
+</head>
+
+<body>
+<div class="page">
+
+  <div class="meta">
+    <span>ApplyPilot</span><span>/</span><span>架构说明</span>
+    <span class="ver">v0.3 · 7 张图</span>
+  </div>
+
+  <h1>AI 只负责判断，浏览器负责<em>读页面</em>和<em>填表</em>。</h1>
+  <p class="lead">见过的页面一次填完；没见过的页面，回头离线做成适配规则。个人信息不出本机。</p>
+
+  <div class="facts">
+    <span><b>2</b> 条路径</span>
+    <span class="hl">每页只问 AI <b>1</b> 次</span>
+    <span><b>5</b> 种页面消息</span>
+    <span><b>4</b> 张表</span>
+    <span>信息库 <b>只在本机</b></span>
+  </div>
+
+  <div class="legend">
+    <span><i></i>主流程</span>
+    <span><i class="dashed"></i>离线 · 可选</span>
+    <span><i class="dot"></i>数据</span>
+  </div>
+
+  <!-- 全局箭头定义：所有图共用，禁止在各自 svg 里重复定义同名 marker -->
+  <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+    <defs>
+      <marker id="ar" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#5b554a"/>
+      </marker>
+      <marker id="ar-a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#9a3f28"/>
+      </marker>
+      <marker id="ar-s" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#31485a"/>
+      </marker>
+      <marker id="ar-g" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#3c5847"/>
+      </marker>
+    </defs>
+  </svg>
+
+<!-- 图 1–3：全景 / 快路径 / 抽取判定。所有 marker 引用页面顶部全局定义。 -->
+
+<div class="fig">
+  <div class="fig-head">
+    <span class="fig-no">图 1</span>
+    <h2>全景与信任边界</h2>
+    <span class="fig-note">三条边界：页面 · 本机 · 外网</span>
+  </div>
+  <div class="fig-scroll">
+    <svg viewBox="0 0 1200 420" role="img" aria-labelledby="fig1t">
+      <title id="fig1t">浏览器扩展、本机 Go 服务与外网 AI 三方全景，个人信息不出本机。</title>
+
+      <line class="edge slate" x1="478" y1="60" x2="478" y2="376"/>
+      <line class="edge slate" x1="902" y1="60" x2="902" y2="376"/>
+
+      <text class="t-idx" x="40" y="30">区域 01 · 浏览器扩展</text>
+      <text class="t-title" x="40" y="50">浏览器扩展</text>
+      <text class="t-note" x="40" y="66">MV3 · WXT · 三个入口</text>
+
+      <text class="t-idx" x="498" y="30">区域 02 · 本机</text>
+      <text class="t-title" x="498" y="50">本机 127.0.0.1:17880</text>
+      <text class="t-note" x="498" y="66">Go · Gin · SQLite · 单机服务</text>
+
+      <text class="t-idx" x="922" y="30">区域 03 · 外网</text>
+      <text class="t-title" x="922" y="50">外网</text>
+      <text class="t-note" x="922" y="66">通过 HTTPS 出网</text>
+
+      <g class="node">
+        <rect class="box" x="40" y="92" width="188" height="84" rx="3"/>
+        <text class="t-idx" x="52" y="110">01 · 页面脚本</text>
+        <text class="t-title" x="52" y="128">页面内脚本</text>
+        <text class="t-sub" x="52" y="145">招聘页 · 读与填</text>
+        <text class="t-mono" x="52" y="160">GET_SCHEMA · FILL</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="278" y="92" width="184" height="84" rx="3"/>
+        <text class="t-idx" x="290" y="110">02 · 侧边栏</text>
+        <text class="t-title" x="290" y="128">侧边栏界面</text>
+        <text class="t-sub" x="290" y="145">信息库 · 核对 · 开始填</text>
+        <text class="t-mono" x="290" y="160">chrome.sidePanel</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="40" y="244" width="188" height="84" rx="3"/>
+        <text class="t-idx" x="52" y="262">03 · 本地存储</text>
+        <text class="t-title" x="52" y="280">chrome.storage</text>
+        <text class="t-sub" x="52" y="297">信息库 / AI 配置 / 令牌</text>
+        <text class="t-mono" x="52" y="312">autoInfo.* · 仅本机</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="278" y="244" width="184" height="84" rx="3"/>
+        <text class="t-idx" x="290" y="262">04 · 后台</text>
+        <text class="t-title" x="290" y="280">后台服务（SW）</text>
+        <text class="t-sub" x="290" y="297">查适配 · 调 AI</text>
+        <text class="t-mono" x="290" y="312">AI_CALL · GET_TOKEN</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="498" y="110" width="380" height="96" rx="3"/>
+        <text class="t-idx" x="510" y="128">本机 · Go 服务</text>
+        <text class="t-title" x="510" y="150">本机 Go 服务（Gin）</text>
+        <text class="t-sub" x="510" y="168">适配 / 上报 / 回填 / 日志</text>
+        <text class="t-mono" x="510" y="188">令牌校验 · 只允许扩展调用</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="528" y="248" width="320" height="88" rx="3"/>
+        <text class="t-idx" x="540" y="266">数据库 · 4 张表</text>
+        <text class="t-title" x="540" y="286">SQLite · 4 张表</text>
+        <text class="t-sub" x="540" y="304">站点 · 上报 · 合并日志 · 回填</text>
+        <text class="t-mono" x="540" y="322">只存页面结构 · 不存填的值</text>
+      </g>
+
+      <g class="node core">
+        <rect class="box" x="922" y="110" width="250" height="96" rx="3"/>
+        <text class="t-idx" x="934" y="128">外网 · AI 服务</text>
+        <text class="t-title" x="934" y="150">AI 服务方</text>
+        <text class="t-sub" x="934" y="168">走 HTTPS · 密钥只在本机</text>
+        <text class="t-mono" x="934" y="188">兼容三种接口格式</text>
+      </g>
+
+      <line class="edge" x1="228" y1="134" x2="278" y2="134" marker-end="url(#ar)"/>
+      <text class="t-tap" x="253" y="194" text-anchor="middle">GET_SCHEMA · FILL</text>
+
+      <line class="edge" x1="370" y1="176" x2="370" y2="244" marker-end="url(#ar)"/>
+      <text class="t-tap" x="380" y="202">AI_CALL 等消息</text>
+      <text class="t-tap" x="380" y="216">长连接流式返回</text>
+
+      <line class="edge" x1="278" y1="286" x2="228" y2="286" marker-end="url(#ar)"/>
+      <text class="t-tap" x="253" y="276" text-anchor="middle">autoInfo</text>
+
+      <line class="edge" x1="462" y1="262" x2="498" y2="180" marker-end="url(#ar)"/>
+      <text class="t-tap" x="500" y="222">适配 / 上报</text>
+      <text class="t-tap" x="500" y="236">回填 / 日志 / 统计</text>
+
+      <path class="edge accent" d="M370 328 V366 H1046 V206" marker-end="url(#ar-a)"/>
+      <text class="t-tap" x="700" y="354" text-anchor="middle">页面结构 + 信息库</text>
+
+      <line class="edge" x1="688" y1="206" x2="688" y2="248" marker-end="url(#ar)"/>
+      <text class="t-tap" x="700" y="232">只存结构</text>
+    </svg>
+  </div>
+</div>
+<p class="callout"><b>个人信息只在本机</b>；发到外网的只有页面结构和信息库文本。</p>
+
+<div class="fig">
+  <div class="fig-head">
+    <span class="fig-no">图 2</span>
+    <h2>快路径 · 一次填表</h2>
+    <span class="fig-note">只问 AI 一次 · 所有字段一起发</span>
+  </div>
+  <div class="fig-scroll">
+    <svg viewBox="0 0 1200 320" role="img" aria-labelledby="fig2t">
+      <title id="fig2t">快路径八个环节：从页面抽取到回读上报，AI 只决策一次。</title>
+
+      <g class="node">
+        <rect class="box" x="28" y="104" width="122" height="92" rx="3"/>
+        <text class="t-idx" x="40" y="123">01 · 页面</text>
+        <text class="t-title" x="40" y="143">招聘页</text>
+        <text class="t-sub" x="40" y="162">页面上的控件</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="174" y="104" width="122" height="92" rx="3"/>
+        <text class="t-idx" x="186" y="123">02 · 抽取</text>
+        <text class="t-title" x="186" y="143">页面内抽取</text>
+        <text class="t-sub" x="186" y="162">标签逐级回退</text>
+        <text class="t-mono" x="186" y="179">选项 / 必填 / 区块</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="320" y="104" width="122" height="92" rx="3"/>
+        <text class="t-idx" x="332" y="123">03 · 适配</text>
+        <text class="t-title" x="332" y="143">服务端适配</text>
+        <text class="t-sub" x="332" y="162">专用 / 通用</text>
+        <text class="t-mono" x="332" y="179">GET /api/schema</text>
+      </g>
+
+      <g class="node core">
+        <rect class="box" x="466" y="104" width="122" height="92" rx="3"/>
+        <text class="t-idx" x="478" y="123">04 · AI</text>
+        <text class="t-title" x="478" y="143">AI 判断一次</text>
+        <text class="t-sub" x="478" y="162">页面结构 + 信息库</text>
+        <text class="t-mono" x="478" y="179">AI_CALL · 不直接连</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="612" y="104" width="122" height="92" rx="3"/>
+        <text class="t-idx" x="624" y="123">05 · 核对</text>
+        <text class="t-title" x="624" y="143">人工核对</text>
+        <text class="t-sub" x="624" y="162">填了哪些 · 可改</text>
+        <text class="t-mono" x="624" y="179">可手动补值</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="758" y="104" width="122" height="92" rx="3"/>
+        <text class="t-idx" x="770" y="123">06 · 填写</text>
+        <text class="t-title" x="770" y="143">按步骤填回</text>
+        <text class="t-sub" x="770" y="162">步骤列表 → 页面</text>
+        <text class="t-mono" x="770" y="179">页面上直接写</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="904" y="104" width="122" height="92" rx="3"/>
+        <text class="t-idx" x="916" y="123">07 · 回读</text>
+        <text class="t-title" x="916" y="143">读回来核对</text>
+        <text class="t-sub" x="916" y="162">读回实际值</text>
+        <text class="t-mono" x="916" y="179">逐字段比对</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="1050" y="104" width="122" height="92" rx="3"/>
+        <text class="t-idx" x="1062" y="123">08 · 上报</text>
+        <text class="t-title" x="1062" y="143">上报这次填写</text>
+        <text class="t-sub" x="1062" y="162">回填记录 / 日志</text>
+        <text class="t-mono" x="1062" y="179">POST /api/fills</text>
+      </g>
+
+      <line class="edge" x1="150" y1="150" x2="174" y2="150" marker-end="url(#ar)"/>
+      <line class="edge" x1="296" y1="150" x2="320" y2="150" marker-end="url(#ar)"/>
+      <line class="edge accent" x1="442" y1="150" x2="466" y2="150" marker-end="url(#ar-a)"/>
+      <line class="edge accent" x1="588" y1="150" x2="612" y2="150" marker-end="url(#ar-a)"/>
+      <line class="edge" x1="734" y1="150" x2="758" y2="150" marker-end="url(#ar)"/>
+      <line class="edge" x1="880" y1="150" x2="904" y2="150" marker-end="url(#ar)"/>
+      <line class="edge" x1="1026" y1="150" x2="1050" y2="150" marker-end="url(#ar)"/>
+
+      <line class="tap-line" x1="308" y1="150" x2="308" y2="96"/>
+      <text class="t-tap" x="308" y="88" text-anchor="middle">页面结构</text>
+
+      <line class="tap-line" x1="600" y1="150" x2="600" y2="96"/>
+      <text class="t-tap" x="600" y="88" text-anchor="middle">判断结果</text>
+
+      <line class="tap-line" x1="746" y1="150" x2="746" y2="208"/>
+      <text class="t-tap" x="746" y="220" text-anchor="middle">填写步骤</text>
+
+      <line class="tap-line" x1="1038" y1="150" x2="1038" y2="208"/>
+      <text class="t-tap" x="1038" y="220" text-anchor="middle">回读值</text>
+
+      <rect class="bar" x="174" y="248" width="414" height="26" rx="3"/>
+      <text class="bar-t" x="381" y="266" text-anchor="middle">全量字段一次发完，不分批</text>
+    </svg>
+  </div>
+</div>
+<p class="callout">AI 只回一份“怎么填”的清单；真正往页面里写的是页面脚本。</p>
+
+<div class="fig">
+  <div class="fig-head">
+    <span class="fig-no">图 3</span>
+    <h2>抽取与适配判定</h2>
+    <span class="fig-note">见过的站用专用规则，没见过的用通用规则</span>
+  </div>
+  <div class="fig-scroll">
+    <svg viewBox="0 0 1200 380" role="img" aria-labelledby="fig3t">
+      <title id="fig3t">重新抽取分叉成适配命中与未命中两条路，非招聘页停在空态。</title>
+
+      <g class="node">
+        <rect class="box" x="36" y="160" width="130" height="84" rx="3"/>
+        <text class="t-idx" x="48" y="180">01 · 起点</text>
+        <text class="t-title" x="48" y="200">重新抽取</text>
+        <text class="t-sub" x="48" y="217">侧边栏按钮</text>
+        <text class="t-mono" x="48" y="232">从页面重跑</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="190" y="160" width="200" height="84" rx="3"/>
+        <text class="t-idx" x="202" y="180">02 · 抽取</text>
+        <text class="t-title" x="202" y="200">页面内抽取</text>
+        <text class="t-sub" x="202" y="217">标签回退 · 选项 · 必填</text>
+        <text class="t-mono" x="202" y="232">区块切分</text>
+      </g>
+
+      <g class="node optional">
+        <rect class="box" x="414" y="160" width="180" height="84" rx="3"/>
+        <text class="t-idx" x="426" y="180">03 · 展开</text>
+        <text class="t-title" x="426" y="200">站点展开规则</text>
+        <text class="t-sub" x="426" y="217">把折叠的内容打开</text>
+        <text class="t-mono" x="426" y="232">expand-rules 有才跑</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="618" y="160" width="190" height="84" rx="3"/>
+        <text class="t-idx" x="630" y="180">04 · 查询</text>
+        <text class="t-title" x="630" y="200">后台查适配</text>
+        <text class="t-sub" x="630" y="217">GET /api/schema</text>
+        <text class="t-mono" x="630" y="232">?domain=…</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="832" y="88" width="170" height="86" rx="3"/>
+        <text class="t-idx" x="844" y="108">05A · 命中</text>
+        <text class="t-title" x="844" y="128">专用规则</text>
+        <text class="t-sub" x="844" y="146">这个站有记录</text>
+        <text class="t-mono" x="844" y="162">按域名对应字段</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="832" y="236" width="170" height="86" rx="3"/>
+        <text class="t-idx" x="844" y="256">05B · 未命中</text>
+        <text class="t-title" x="844" y="276">通用规则兜底</text>
+        <text class="t-sub" x="844" y="294">这个站没记录</text>
+        <text class="t-mono" x="844" y="310">按常见写法猜</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="1032" y="155" width="140" height="90" rx="3"/>
+        <text class="t-idx" x="1044" y="175">06 · 字段</text>
+        <text class="t-title" x="1044" y="195">字段列表</text>
+        <text class="t-sub" x="1044" y="213">能填的 / 填不了的</text>
+        <text class="t-mono" x="1044" y="229">进入人工核对</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="190" y="290" width="200" height="78" rx="3"/>
+        <text class="t-idx" x="202" y="310">出口 · 空状态</text>
+        <text class="t-title" x="202" y="330">不是招聘页就空着</text>
+        <text class="t-sub" x="202" y="348">探测不通 / 被拦</text>
+      </g>
+
+      <line class="edge" x1="166" y1="202" x2="190" y2="202" marker-end="url(#ar)"/>
+      <line class="edge slate" x1="390" y1="202" x2="414" y2="202" marker-end="url(#ar-s)"/>
+      <line class="edge" x1="594" y1="202" x2="618" y2="202" marker-end="url(#ar)"/>
+
+      <line class="tap-line" x1="606" y1="202" x2="606" y2="138"/>
+      <text class="t-tap" x="606" y="130" text-anchor="middle">页面结构</text>
+
+      <line class="edge" x1="808" y1="190" x2="832" y2="145" marker-end="url(#ar)"/>
+      <line class="edge" x1="808" y1="214" x2="832" y2="270" marker-end="url(#ar)"/>
+
+      <line class="edge" x1="1002" y1="135" x2="1032" y2="190" marker-end="url(#ar)"/>
+      <line class="edge" x1="1002" y1="280" x2="1032" y2="215" marker-end="url(#ar)"/>
+
+      <line class="edge" x1="290" y1="244" x2="290" y2="290" marker-end="url(#ar)"/>
+      <text class="t-tap" x="300" y="266">探测失败</text>
+      <text class="t-tap" x="300" y="279">门禁拦住</text>
+    </svg>
+  </div>
+</div>
+
+<!-- 图 4–7 · 信息库 / 手动补值 / 慢路径 / 契约与存储 -->
+
+<div class="fig">
+  <div class="fig-head"><span class="fig-no">图 4</span><h2>信息库导入：先在本地读成一段文字</h2><span class="fig-note">≤12 个文件 · 单个 ≤8MB · 文本 ≤3 万字</span></div>
+  <div class="fig-scroll">
+    <svg viewBox="0 0 1200 410" role="img" aria-labelledby="fig4t">
+      <title id="fig4t">信息库导入流程：选文件、暂存、本地读成文字、拼成一段、AI 整理；有旧库就合并，没有就直接写入本地存储。底部是读取、整理、合并、写入四段进度</title>
+
+      <!-- 主链 -->
+      <line class="edge" x1="156" y1="106" x2="182" y2="106" marker-end="url(#ar)"/>
+      <line class="edge" x1="294" y1="106" x2="318" y2="106" marker-end="url(#ar)"/>
+      <line class="edge" x1="440" y1="106" x2="466" y2="106" marker-end="url(#ar)"/>
+      <line class="edge" x1="590" y1="106" x2="616" y2="106" marker-end="url(#ar)"/>
+      <line class="edge accent" x1="736" y1="106" x2="760" y2="106" marker-end="url(#ar-a)"/>
+      <line class="edge accent" x1="864" y1="106" x2="888" y2="106" marker-end="url(#ar-a)"/>
+      <line class="edge" x1="1024" y1="106" x2="1048" y2="106" marker-end="url(#ar)"/>
+
+      <!-- 无旧库：绕过合并 -->
+      <line class="edge" x1="812" y1="64" x2="812" y2="40"/>
+      <line class="edge" x1="812" y1="40" x2="1110" y2="40"/>
+      <line class="edge" x1="1110" y1="40" x2="1110" y2="64" marker-end="url(#ar)"/>
+      <text class="t-tap" x="980" y="34" text-anchor="middle">无旧库 · 直接写入</text>
+
+      <!-- 删除支线 -->
+      <line class="edge slate" x1="1140" y1="148" x2="1140" y2="196" marker-end="url(#ar-s)"/>
+
+      <g class="node">
+        <rect class="box" x="28" y="64" width="128" height="84" rx="3"/>
+        <text class="t-idx" x="40" y="82">01 · 输入</text>
+        <text class="t-title" x="40" y="103">拖入 / 选择</text>
+        <text class="t-sub" x="40" y="121">N 个文件</text>
+        <text class="t-mono" x="40" y="137">选文件</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="182" y="64" width="112" height="84" rx="3"/>
+        <text class="t-idx" x="194" y="82">02 · 暂存</text>
+        <text class="t-title" x="194" y="103">暂存</text>
+        <text class="t-sub" x="194" y="121">最多 12 个</text>
+        <text class="t-mono" x="194" y="137">单个 ≤8MB</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="318" y="64" width="122" height="84" rx="3"/>
+        <text class="t-idx" x="330" y="82">03 · 读取</text>
+        <text class="t-title" x="330" y="103">本地读文本</text>
+        <text class="t-sub" x="330" y="121">txt / md / docx</text>
+        <text class="t-mono" x="330" y="137">不上传</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="466" y="64" width="124" height="84" rx="3"/>
+        <text class="t-idx" x="478" y="82">04 · 拼段</text>
+        <text class="t-title" x="478" y="103">拼成一段</text>
+        <text class="t-sub" x="478" y="121">用文件名分段</text>
+        <text class="t-mono" x="478" y="137">≤ 3 万字</text>
+      </g>
+
+      <g class="node core">
+        <rect class="box" x="616" y="64" width="120" height="84" rx="3"/>
+        <text class="t-idx" x="628" y="82">05 · AI</text>
+        <text class="t-title" x="628" y="103">AI 整理文字</text>
+        <text class="t-sub" x="628" y="121">边读边整理</text>
+        <text class="t-mono" x="628" y="137">AI_PARSE_STREAM</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="760" y="64" width="104" height="84" rx="3"/>
+        <text class="t-idx" x="772" y="82">06 · 分叉</text>
+        <text class="t-title" x="772" y="103">有旧库？</text>
+        <text class="t-sub" x="772" y="121">有 → 合并</text>
+        <text class="t-mono" x="772" y="137">无 → 直写</text>
+      </g>
+
+      <g class="node core">
+        <rect class="box" x="888" y="64" width="136" height="84" rx="3"/>
+        <text class="t-idx" x="900" y="82">07 · AI</text>
+        <text class="t-title" x="900" y="103">AI 合并</text>
+        <text class="t-sub" x="900" y="121">追加到旧库</text>
+        <text class="t-mono" x="900" y="137">AI_MERGE · 少一半就停</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="1048" y="64" width="124" height="84" rx="3"/>
+        <text class="t-idx" x="1060" y="82">08 · 落盘</text>
+        <text class="t-title" x="1060" y="103">写入本地存储</text>
+        <text class="t-sub" x="1060" y="121">信息库文本</text>
+        <text class="t-mono" x="1060" y="137">同时刷新 updatedAt</text>
+      </g>
+
+      <g class="node optional">
+        <rect class="box" x="996" y="196" width="164" height="76" rx="3"/>
+        <text class="t-idx" x="1008" y="216">支线 · 可选</text>
+        <text class="t-title" x="1008" y="238">删除信息库</text>
+        <text class="t-sub" x="1008" y="257">清掉两处存储 · 不能撤销</text>
+      </g>
+
+      <!-- 进度 -->
+      <text class="t-idx" x="28" y="300">进度 · 0–100</text>
+      <rect class="bar" x="28" y="310" width="172" height="24" rx="2"/>
+      <rect class="bar" x="200" y="310" width="629" height="24" rx="2"/>
+      <rect class="bar" x="829" y="310" width="252" height="24" rx="2"/>
+      <rect class="bar" x="1103" y="310" width="69" height="24" rx="2"/>
+      <text class="bar-t" x="40" y="326">① 读取 0–15</text>
+      <text class="bar-t" x="212" y="326">② AI 整理 15–70</text>
+      <text class="bar-t" x="841" y="326">③ AI 合并 70–92</text>
+      <text class="bar-t" x="1113" y="326">④ 写入</text>
+
+      <line class="tap-line" x1="28" y1="334" x2="28" y2="342"/>
+      <line class="tap-line" x1="200" y1="334" x2="200" y2="342"/>
+      <line class="tap-line" x1="829" y1="334" x2="829" y2="342"/>
+      <line class="tap-line" x1="1081" y1="334" x2="1081" y2="342"/>
+      <line class="tap-line" x1="1103" y1="334" x2="1103" y2="342"/>
+      <line class="tap-line" x1="1172" y1="334" x2="1172" y2="342"/>
+      <text class="t-note" x="28" y="356" text-anchor="start">0</text>
+      <text class="t-note" x="200" y="356" text-anchor="middle">15</text>
+      <text class="t-note" x="829" y="356" text-anchor="middle">70</text>
+      <text class="t-note" x="1081" y="356" text-anchor="middle">92</text>
+      <text class="t-note" x="1103" y="356" text-anchor="middle">94</text>
+      <text class="t-note" x="1172" y="356" text-anchor="end">100</text>
+
+      <text class="t-note" x="28" y="384">进度会回传侧边栏：读取 → 整理 → 合并 → 写入；写入时刷新 updatedAt。</text>
+    </svg>
+  </div>
+</div>
+
+<div class="fig">
+  <div class="fig-head"><span class="fig-no">图 5</span><h2>手动补值：先写进页面，再存进信息库</h2><span class="fig-note">填写失败就停 · 不写本地存储</span></div>
+  <div class="fig-scroll">
+    <svg viewBox="0 0 1200 300" role="img" aria-labelledby="fig5t">
+      <title id="fig5t">手动补值合并：没填的行手工输入草稿，先填进页面并读回核对，再合并进信息库，最后页面上已填好</title>
+
+      <line class="edge" x1="178" y1="150" x2="242" y2="150" marker-end="url(#ar)"/>
+      <line class="edge" x1="418" y1="150" x2="482" y2="150" marker-end="url(#ar)"/>
+      <line class="edge accent" x1="682" y1="150" x2="746" y2="150" marker-end="url(#ar-a)"/>
+      <line class="edge" x1="932" y1="150" x2="996" y2="150" marker-end="url(#ar)"/>
+
+      <g class="node">
+        <rect class="box" x="28" y="108" width="150" height="84" rx="3"/>
+        <text class="t-idx" x="40" y="126">01 · 缺口</text>
+        <text class="t-title" x="40" y="147">未填行</text>
+        <text class="t-sub" x="40" y="165">还差哪些没填</text>
+        <text class="t-mono" x="40" y="181">没对上填写步骤</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="242" y="108" width="176" height="84" rx="3"/>
+        <text class="t-idx" x="254" y="126">02 · 草稿</text>
+        <text class="t-title" x="254" y="147">手工输入</text>
+        <text class="t-sub" x="254" y="165">当场在页面补</text>
+        <text class="t-mono" x="254" y="181">不直接入库</text>
+      </g>
+
+      <g class="node core">
+        <rect class="box" x="482" y="108" width="200" height="84" rx="3"/>
+        <text class="t-idx" x="494" y="126">03 · 入库</text>
+        <text class="t-title" x="494" y="147">存进信息库</text>
+        <text class="t-sub" x="494" y="165">先填页面再合并</text>
+        <text class="t-mono" x="494" y="181">填不进去就中止</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="746" y="108" width="186" height="84" rx="3"/>
+        <text class="t-idx" x="758" y="126">04 · 存储</text>
+        <text class="t-title" x="758" y="147">写入本地存储</text>
+        <text class="t-sub" x="758" y="165">信息库多一行</text>
+        <text class="t-mono" x="758" y="181">candidateProfile</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="996" y="108" width="176" height="84" rx="3"/>
+        <text class="t-idx" x="1008" y="126">05 · 完成</text>
+        <text class="t-title" x="1008" y="147">页面已填</text>
+        <text class="t-sub" x="1008" y="165">覆盖率提升</text>
+        <text class="t-mono" x="1008" y="181">人工可再改</text>
+      </g>
+
+      <text class="t-note" x="28" y="66">手工补的那几行，也走同一套契约。</text>
+
+      <line class="edge green" x1="582" y1="192" x2="582" y2="222" marker-end="url(#ar-g)"/>
+      <text class="t-green" x="582" y="240" text-anchor="middle">填写失败 · 不合并</text>
+      <text class="t-note" x="582" y="258" text-anchor="middle">先确认写进页面，再更新信息库。</text>
+    </svg>
+  </div>
+</div>
+
+<div class="fig">
+  <div class="fig-head"><span class="fig-no">图 6</span><h2>慢路径：陌生页面，离线做成适配规则</h2><span class="fig-note">上报 → 离线还原 → 存成规则 → 下次直接用</span></div>
+  <div class="fig-scroll">
+    <svg viewBox="0 0 1200 356" role="img" aria-labelledby="fig6t">
+      <title id="fig6t">慢路径：陌生页面采集快照并上报到上报表，离线还原出适配规则，再写回站点表；下次打开时直接查到专用规则</title>
+
+      <line class="edge" x1="248" y1="106" x2="304" y2="106" marker-end="url(#ar)"/>
+      <line class="edge" x1="554" y1="106" x2="610" y2="106" marker-end="url(#ar)"/>
+      <line class="edge" x1="870" y1="106" x2="926" y2="106" marker-end="url(#ar)"/>
+
+      <!-- 上报落盘后折到第二行 -->
+      <line class="edge" x1="1049" y1="148" x2="1049" y2="178"/>
+      <line class="edge" x1="1049" y1="178" x2="113" y2="178"/>
+      <line class="edge" x1="113" y1="178" x2="113" y2="204" marker-end="url(#ar)"/>
+      <text class="t-tap" x="581" y="172" text-anchor="middle">取回快照</text>
+
+      <line class="edge" x1="198" y1="246" x2="238" y2="246" marker-end="url(#ar)"/>
+      <line class="edge" x1="418" y1="246" x2="458" y2="246" marker-end="url(#ar)"/>
+      <line class="edge" x1="688" y1="246" x2="728" y2="246" marker-end="url(#ar)"/>
+      <line class="edge" x1="878" y1="246" x2="918" y2="246" marker-end="url(#ar)"/>
+
+      <!-- 回流：下次直接命中 -->
+      <line class="edge green" x1="1045" y1="288" x2="1045" y2="322"/>
+      <line class="edge green" x1="1045" y1="322" x2="220" y2="322"/>
+      <line class="edge green" x1="220" y1="322" x2="220" y2="148" marker-end="url(#ar-g)"/>
+      <text class="t-green" x="630" y="314" text-anchor="middle">下次再打开 · 直接用这份规则</text>
+
+      <g class="node">
+        <rect class="box" x="28" y="64" width="220" height="84" rx="3"/>
+        <text class="t-idx" x="40" y="82">01 · 起点</text>
+        <text class="t-title" x="40" y="103">陌生页面</text>
+        <text class="t-sub" x="40" y="121">结构没见过</text>
+        <text class="t-mono" x="40" y="137">没有专用规则</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="304" y="64" width="250" height="84" rx="3"/>
+        <text class="t-idx" x="316" y="82">02 · 采集</text>
+        <text class="t-title" x="316" y="103">页面快照</text>
+        <text class="t-sub" x="316" y="121">html / css / 脚本信息</text>
+        <text class="t-mono" x="316" y="137">页面结构一起存</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="610" y="64" width="260" height="84" rx="3"/>
+        <text class="t-idx" x="622" y="82">03 · 上报</text>
+        <text class="t-title" x="622" y="103">上报给本机服务</text>
+        <text class="t-sub" x="622" y="121">清空已填的值再传</text>
+        <text class="t-mono" x="622" y="137">POST /api/reports</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="926" y="64" width="246" height="84" rx="3"/>
+        <text class="t-idx" x="938" y="82">04 · 入库</text>
+        <text class="t-title" x="938" y="103">上报表（reports）</text>
+        <text class="t-sub" x="938" y="121">SQLite · 只存结构</text>
+        <text class="t-mono" x="938" y="137">等人工离线处理</text>
+      </g>
+
+      <g class="node optional">
+        <rect class="box" x="28" y="204" width="170" height="84" rx="3"/>
+        <text class="t-idx" x="40" y="222">05 · 离线</text>
+        <text class="t-title" x="40" y="243">离线还原</text>
+        <text class="t-sub" x="40" y="261">本地打开快照</text>
+        <text class="t-mono" x="40" y="277">本地 · 不联网</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="238" y="204" width="180" height="84" rx="3"/>
+        <text class="t-idx" x="250" y="222">06 · 适配</text>
+        <text class="t-title" x="250" y="243">适配规则文件</text>
+        <text class="t-sub" x="250" y="261">展开规则 + 字段</text>
+        <text class="t-mono" x="250" y="277">按域名存</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="458" y="204" width="230" height="84" rx="3"/>
+        <text class="t-idx" x="470" y="222">07 · 发布</text>
+        <text class="t-title" x="470" y="243">存回本机服务</text>
+        <text class="t-sub" x="470" y="261">带上令牌写入</text>
+        <text class="t-mono" x="470" y="277">PUT /api/sites/…</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="728" y="204" width="150" height="84" rx="3"/>
+        <text class="t-idx" x="740" y="222">08 · 入库</text>
+        <text class="t-title" x="740" y="243">站点表（sites）</text>
+        <text class="t-sub" x="740" y="261">按域名取</text>
+        <text class="t-mono" x="740" y="277">schema_json</text>
+      </g>
+
+      <g class="node">
+        <rect class="box" x="918" y="204" width="254" height="84" rx="3"/>
+        <text class="t-idx" x="930" y="222">09 · 下次</text>
+        <text class="t-title" x="930" y="243">GET /api/schema</text>
+        <text class="t-sub" x="930" y="261">直接用专用规则</text>
+        <text class="t-mono" x="930" y="277">不用再问 AI</text>
+      </g>
+    </svg>
+  </div>
+</div>
+
+<div class="fig">
+  <div class="fig-head"><span class="fig-no">图 7</span><h2>消息约定与本地存储</h2><span class="fig-note">页面 5 条 · 后台 7 条 · 流式 3 条 · 本地 5 个键</span></div>
+  <div class="fig-scroll">
+    <svg viewBox="0 0 1200 360" role="img" aria-labelledby="fig7t">
+      <title id="fig7t">消息约定与本地存储：页面消息 5 条、后台消息 7 条、流式通道 3 条，以及 chrome.storage.local 里的 5 个键</title>
+
+      <text class="t-title" x="28" y="44">消息约定</text>
+      <text class="t-note" x="28" y="62">页面 5 条 · 后台 7 条 · 流式 3 条，名字不能改</text>
+
+      <text class="t-idx" x="28" y="94">页面消息 · 标签页 ↔ 侧边栏</text>
+      <g class="node">
+        <rect class="box" x="28" y="104" width="126" height="32" rx="4"/>
+        <text class="t-mono" x="91" y="124" text-anchor="middle">GET_SCHEMA</text>
+      </g>
+      <g class="node">
+        <rect class="box" x="164" y="104" width="126" height="32" rx="4"/>
+        <text class="t-mono" x="227" y="124" text-anchor="middle">FILL</text>
+      </g>
+      <g class="node">
+        <rect class="box" x="300" y="104" width="126" height="32" rx="4"/>
+        <text class="t-mono" x="363" y="124" text-anchor="middle">CLEAR</text>
+      </g>
+      <g class="node">
+        <rect class="box" x="436" y="104" width="126" height="32" rx="4"/>
+        <text class="t-mono" x="499" y="124" text-anchor="middle">FOCUS_FIELD</text>
+      </g>
+      <g class="node">
+        <rect class="box" x="572" y="104" width="126" height="32" rx="4"/>
+        <text class="t-mono" x="635" y="124" text-anchor="middle">PING</text>
+      </g>
+
+      <text class="t-idx" x="28" y="168">后台消息 · 侧边栏 → 后台</text>
+      <g class="node">
+        <rect class="box" x="28" y="178" width="160" height="32" rx="4"/>
+        <text class="t-mono" x="108" y="198" text-anchor="middle">AI_CALL</text>
+      </g>
+      <g class="node">
+        <rect class="box" x="198" y="178" width="160" height="32" rx="4"/>
+        <text class="t-mono" x="278" y="198" text-anchor="middle">AI_PARSE</text>
+      </g>
+      <g class="node">
+        <rect class="box" x="368" y="178" width="160" height="32" rx="4"/>
+        <text class="t-mono" x="448" y="198" text-anchor="middle">AI_MERGE</text>
+      </g>
+      <g class="node">
+        <rect class="box" x="538" y="178" width="160" height="32" rx="4"/>
+        <text class="t-mono" x="618" y="198" text-anchor="middle">GET_SCHEMA</text>
+      </g>
+      <g class="node">
+        <rect class="box" x="28" y="220" width="160" height="32" rx="4"/>
+        <text class="t-mono" x="108" y="240" text-anchor="middle">GET_TOKEN</text>
+      </g>
+      <g class="node">
+        <rect class="box" x="198" y="220" width="160" height="32" rx="4"/>
+        <text class="t-mono" x="278" y="240" text-anchor="middle">SET_TOKEN</text>
+      </g>
+      <g class="node">
+        <rect class="box" x="368" y="220" width="160" height="32" rx="4"/>
+        <text class="t-mono" x="448" y="240" text-anchor="middle">GET_SETTINGS</text>
+      </g>
+
+      <text class="t-idx" x="28" y="284">流式通道 · 长连接</text>
+      <g class="node">
+        <rect class="box" x="28" y="294" width="216" height="32" rx="4"/>
+        <text class="t-mono" x="136" y="314" text-anchor="middle">AI_STREAM</text>
+      </g>
+      <g class="node">
+        <rect class="box" x="255" y="294" width="216" height="32" rx="4"/>
+        <text class="t-mono" x="363" y="314" text-anchor="middle">AI_PARSE_STREAM</text>
+      </g>
+      <g class="node">
+        <rect class="box" x="482" y="294" width="216" height="32" rx="4"/>
+        <text class="t-mono" x="590" y="314" text-anchor="middle">AI_MERGE_STREAM</text>
+      </g>
+
+      <text class="t-title" x="746" y="44">本地存储</text>
+      <text class="t-note" x="746" y="62">chrome.storage.local · 不出本机</text>
+
+      <g class="node">
+        <rect class="box" x="746" y="86" width="426" height="42" rx="3"/>
+        <text class="t-sub" x="760" y="112">candidateProfile · 信息库</text>
+        <text class="t-mono" x="1158" y="112" text-anchor="end">{ text }</text>
+      </g>
+      <g class="node">
+        <rect class="box" x="746" y="138" width="426" height="42" rx="3"/>
+        <text class="t-sub" x="760" y="164">candidateProfileMeta · 更新时间</text>
+        <text class="t-mono" x="1158" y="164" text-anchor="end">{ updatedAt }</text>
+      </g>
+      <g class="node">
+        <rect class="box" x="746" y="190" width="426" height="42" rx="3"/>
+        <text class="t-sub" x="760" y="216">aiProfiles · AI 配置</text>
+        <text class="t-mono" x="1158" y="216" text-anchor="end">{ profiles, activeId, modelsCache }</text>
+      </g>
+      <g class="node">
+        <rect class="box" x="746" y="242" width="426" height="42" rx="3"/>
+        <text class="t-sub" x="760" y="268">baseUrl · 本机服务地址</text>
+        <text class="t-mono" x="1158" y="268" text-anchor="end">127.0.0.1:17880</text>
+      </g>
+      <g class="node">
+        <rect class="box" x="746" y="294" width="426" height="42" rx="3"/>
+        <text class="t-sub" x="760" y="320">token · 服务端令牌</text>
+        <text class="t-mono" x="1158" y="320" text-anchor="end">只存本地</text>
+      </g>
+
+      <text class="t-note" x="28" y="348">消息名固定不变；信息库和密钥都不出本机。</text>
+    </svg>
+  </div>
+</div>
+
+  <div class="redlines">
+    <div><span>红线 01</span>信息库只在本机，服务端只存页面结构。</div>
+    <div><span>红线 02</span>上报前清空已填的值。</div>
+    <div><span>红线 03</span>永不自动提交。</div>
+  </div>
+
+  <div class="foot">
+    <span>核心数据 SchemaJSON / Step[] / AdapterJSON</span>
+    <span>构建 tsc · wxt build · go test</span>
+  </div>
+
+</div>
+</body>
+</html>

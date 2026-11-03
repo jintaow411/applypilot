@@ -1,0 +1,17 @@
+{
+  "name": "applypilot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "求职信息库自动填表：抽取字段 → 匹配信息库 → 回填招聘页",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^11.8.0",
+      "onFail": "download"
+    }
+  },
+  "devDependencies": {
+    "playwright": "^1.64.1"
+  }
+}
